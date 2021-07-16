@@ -695,11 +695,15 @@ namespace loguru
 
 	const char* home_dir()
 	{
-		#ifdef _WIN32
+		#ifdef __MINGW32__
+			auto home = getenv("USERPROFILE");
+			CHECK_F(home != nullptr, "Missing USERPROFILE");
+			return home;
+		#elif defined(_WIN32)
 			char* user_profile;
 			size_t len;
 			errno_t err = _dupenv_s(&user_profile, &len, "USERPROFILE");
-			CHECK_F(err != 0, "Missing USERPROFILE");
+			CHECK_F(err == 0, "Missing USERPROFILE");
 			return user_profile;
 		#else // _WIN32
 			auto home = getenv("HOME");
@@ -1057,7 +1061,7 @@ namespace loguru
 		#if LOGURU_PTLS_NAMES
 			(void)pthread_once(&s_pthread_key_once, make_pthread_key_name);
 			if (const char* name = static_cast<const char*>(pthread_getspecific(s_pthread_key_name))) {
-				snprintf(buffer, length, "%s", name);
+				snprintf(buffer, static_cast<size_t>(length), "%s", name);
 			} else {
 				buffer[0] = 0;
 			}
@@ -1067,7 +1071,7 @@ namespace loguru
 			// only some platforms support it (currently).
 			pthread_getname_np(pthread_self(), buffer, length);
 		#elif LOGURU_WINTHREADS
-			snprintf(buffer, (size_t)length, "%s", thread_name_buffer());
+			snprintf(buffer, static_cast<size_t>(length), "%s", thread_name_buffer());
 		#else
 			// Thread names unsupported
 			buffer[0] = 0;
@@ -1094,9 +1098,9 @@ namespace loguru
 			#endif
 
 			if (right_align_hex_id) {
-				snprintf(buffer, length, "%*X", static_cast<int>(length - 1), static_cast<unsigned>(thread_id));
+				snprintf(buffer, static_cast<size_t>(length), "%*X", static_cast<int>(length - 1), static_cast<unsigned>(thread_id));
 			} else {
-				snprintf(buffer, length, "%X", static_cast<unsigned>(thread_id));
+				snprintf(buffer, static_cast<size_t>(length), "%X", static_cast<unsigned>(thread_id));
 			}
 		}
 	}

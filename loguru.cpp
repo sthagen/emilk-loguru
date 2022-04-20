@@ -1,4 +1,4 @@
-#ifndef _WIN32
+#if defined(__GNUC__) || defined(__clang__)
 // Disable all warnings from gcc/clang:
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpragmas"
@@ -11,16 +11,13 @@
 #pragma GCC diagnostic ignored "-Wgnu-zero-variadic-macro-arguments"
 #pragma GCC diagnostic ignored "-Wmissing-prototypes"
 #pragma GCC diagnostic ignored "-Wpadded"
-#pragma GCC diagnostic ignored "-Wsign-compare"
 #pragma GCC diagnostic ignored "-Wsign-conversion"
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wunused-macros"
 #pragma GCC diagnostic ignored "-Wzero-as-null-pointer-constant"
-#else
-#ifdef _MSC_VER
+#elif defined(_MSC_VER)
 #pragma warning(push)
-#pragma warning(disable:4018)
-#endif // _MSC_VER
+#pragma warning(disable:4365) // conversion from 'X' to 'Y', signed/unsigned mismatch
 #endif
 
 #include "loguru.hpp"
@@ -78,23 +75,24 @@
 
 // TODO: use defined(_POSIX_VERSION) for some of these things?
 
+
 #if defined(_WIN32) || defined(__CYGWIN__)
 	#define LOGURU_PTHREADS    0
 	#define LOGURU_WINTHREADS  1
 	#ifndef LOGURU_STACKTRACES
 		#define LOGURU_STACKTRACES 0
 	#endif
-#elif defined(__rtems__) || defined(__ANDROID__) || defined(__FreeBSD__)
-	#define LOGURU_PTHREADS    1
-	#define LOGURU_WINTHREADS  0
-	#ifndef LOGURU_STACKTRACES
-		#define LOGURU_STACKTRACES 0
-	#endif
 #else
 	#define LOGURU_PTHREADS    1
 	#define LOGURU_WINTHREADS  0
-	#ifndef LOGURU_STACKTRACES
-		#define LOGURU_STACKTRACES 1
+	#ifdef __GLIBC__
+		#ifndef LOGURU_STACKTRACES
+			#define LOGURU_STACKTRACES 1
+		#endif
+	#else
+		#ifndef LOGURU_STACKTRACES
+			#define LOGURU_STACKTRACES 0
+		#endif
 	#endif
 #endif
 
@@ -137,6 +135,7 @@
    #define LOGURU_PTLS_NAMES 0
 #endif
 
+LOGURU_ANONYMOUS_NAMESPACE_BEGIN
 
 namespace loguru
 {
@@ -1244,27 +1243,48 @@ namespace loguru
 	{
 		if (out_buff_size == 0) { return; }
 		out_buff[0] = '\0';
-		long pos = 0;
+		size_t pos = 0;
 		if (g_preamble_date && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "date       ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "date       ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_time && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "time         ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "time         ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_uptime && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "( uptime  ) ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "( uptime  ) ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_thread && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]", LOGURU_THREADNAME_WIDTH, " thread name/id");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]", LOGURU_THREADNAME_WIDTH, " thread name/id");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_file && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%*s:line  ", LOGURU_FILENAME_WIDTH, "file");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%*s:line  ", LOGURU_FILENAME_WIDTH, "file");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_verbose && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "   v");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "   v");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_pipe && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 	}
 
@@ -1293,39 +1313,60 @@ namespace loguru
 		if (custom_level_name) {
 			snprintf(level_buff, sizeof(level_buff) - 1, "%s", custom_level_name);
 		} else {
-			snprintf(level_buff, sizeof(level_buff) - 1, "% 4d", verbosity);
+			snprintf(level_buff, sizeof(level_buff) - 1, "% 4d", static_cast<int8_t>(verbosity));
 		}
 
-		long pos = 0;
+		size_t pos = 0;
 
 		if (g_preamble_date && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%04d-%02d-%02d ",
-				             1900 + time_info.tm_year, 1 + time_info.tm_mon, time_info.tm_mday);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%04d-%02d-%02d ",
+				                 1900 + time_info.tm_year, 1 + time_info.tm_mon, time_info.tm_mday);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_time && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%02d:%02d:%02d.%03lld ",
-			               time_info.tm_hour, time_info.tm_min, time_info.tm_sec, ms_since_epoch % 1000);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%02d:%02d:%02d.%03lld ",
+			                     time_info.tm_hour, time_info.tm_min, time_info.tm_sec, ms_since_epoch % 1000);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_uptime && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "(%8.3fs) ",
-			               uptime_sec);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "(%8.3fs) ",
+			                     uptime_sec);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_thread && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]",
-			               LOGURU_THREADNAME_WIDTH, thread_name);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "[%-*s]",
+			                     LOGURU_THREADNAME_WIDTH, thread_name);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_file && pos < out_buff_size) {
 			char shortened_filename[LOGURU_FILENAME_WIDTH + 1];
 			snprintf(shortened_filename, LOGURU_FILENAME_WIDTH + 1, "%s", file);
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%*s:%-5u ",
-			               LOGURU_FILENAME_WIDTH, shortened_filename, line);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%*s:%-5u ",
+			                     LOGURU_FILENAME_WIDTH, shortened_filename, line);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_verbose && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "%4s",
-			               level_buff);
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "%4s",
+			                     level_buff);
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 		if (g_preamble_pipe && pos < out_buff_size) {
-			pos += snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			int bytes = snprintf(out_buff + pos, out_buff_size - pos, "| ");
+			if (bytes > 0) {
+				pos += bytes;
+			}
 		}
 	}
 
@@ -1459,9 +1500,14 @@ namespace loguru
 	{
 		va_list vlist;
 		va_start(vlist, format);
+		vlog(verbosity, file, line, format, vlist);
+		va_end(vlist);
+	}
+
+	void vlog(Verbosity verbosity, const char* file, unsigned line, const char* format, va_list vlist)
+	{
 		auto buff = vtextprintf(format, vlist);
 		log_to_everywhere(1, verbosity, file, line, "", buff.c_str());
-		va_end(vlist);
 	}
 
 	void raw_log(Verbosity verbosity, const char* file, unsigned line, const char* format, ...)
@@ -1488,31 +1534,19 @@ namespace loguru
 		s_needs_flushing = false;
 	}
 
-	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, ...)
-		: _verbosity(verbosity), _file(file), _line(line)
+	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, va_list vlist) :
+		_verbosity(verbosity), _file(file), _line(line)
 	{
-		if (verbosity <= current_verbosity_cutoff()) {
-			std::lock_guard<std::recursive_mutex> lock(s_mutex);
-			_indent_stderr = (verbosity <= g_stderr_verbosity);
-			_start_time_ns = now_ns();
-			va_list vlist;
-			va_start(vlist, format);
-			vsnprintf(_name, sizeof(_name), format, vlist);
-			log_to_everywhere(1, _verbosity, file, line, "{ ", _name);
-			va_end(vlist);
+		this->Init(format, vlist);
+	}
 
-			if (_indent_stderr) {
-				++s_stderr_indentation;
-			}
-
-			for (auto& p : s_callbacks) {
-				if (verbosity <= p.verbosity) {
-					++p.indentation;
-				}
-			}
-		} else {
-			_file = nullptr;
-		}
+	LogScopeRAII::LogScopeRAII(Verbosity verbosity, const char* file, unsigned line, const char* format, ...) :
+		_verbosity(verbosity), _file(file), _line(line)
+	{
+		va_list vlist;
+		va_start(vlist, format);
+		this->Init(format, vlist);
+		va_end(vlist);
 	}
 
 	LogScopeRAII::~LogScopeRAII()
@@ -1542,6 +1576,29 @@ namespace loguru
 #else
 			log_to_everywhere(1, _verbosity, _file, _line, "}", "");
 #endif
+		}
+	}
+
+	void LogScopeRAII::Init(const char* format, va_list vlist)
+	{
+		if (_verbosity <= current_verbosity_cutoff()) {
+			std::lock_guard<std::recursive_mutex> lock(s_mutex);
+			_indent_stderr = (_verbosity <= g_stderr_verbosity);
+			_start_time_ns = now_ns();
+			vsnprintf(_name, sizeof(_name), format, vlist);
+			log_to_everywhere(1, _verbosity, _file, _line, "{ ", _name);
+
+			if (_indent_stderr) {
+				++s_stderr_indentation;
+			}
+
+			for (auto& p : s_callbacks) {
+				if (_verbosity <= p.verbosity) {
+					++p.indentation;
+				}
+			}
+		} else {
+			_file = nullptr;
 		}
 	}
 
@@ -1956,10 +2013,13 @@ namespace loguru
 
 #endif // _WIN32
 
-#ifdef _WIN32
-#ifdef _MSC_VER
+
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#elif defined(_MSC_VER)
 #pragma warning(pop)
-#endif // _MSC_VER
-#endif // _WIN32
+#endif
+
+LOGURU_ANONYMOUS_NAMESPACE_END
 
 #endif // LOGURU_IMPLEMENTATION
